@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeleAgro - Tareas de Agricultura</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+      }
+      .container {
+        width: 50%;
+        margin: auto;
+        padding: 20px;
+        border: 1px solid #000;
+      }
+      .btn-agregar {
+        margin-bottom: 20px;
+        cursor: pointer;
+      }
+      .lista-tareas {
+        list-style-type: none;
+        padding: 0;
+      }
+      .formulario-tarea {
+        display: none;
+        margin-bottom: 20px;
+      }
+      .tarea.rojo {
+        color: red;
+      }
+      .tarea.amarillo {
+        color: #D4A017;
+      }
+      .tarea.verde {
+        color: green;
+      }
+      .tarea.bold {
+        font-weight: bold;
+      }
+      .tarea.finalizado {
+        text-decoration: line-through;
+        animation: parpadeo 1s infinite alternate;
+      }
+      .tarea.animacion-color {
+        animation: cambiarColor 2s infinite alternate;
+      }
+      @keyframes parpadeo {
+        0% { opacity: 1; }
+        100% { opacity: 0.5; }
+      }
+      @keyframes cambiarColor {
+        0% { color: red; }
+        100% { color: purple; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>TeleAgro</h2>
+      <button class="btn-agregar" id="agregarTareaBtn">+ Agregar Tarea</button>
+      <div class="formulario-tarea" id="formularioTarea">
+        <label>Nombre:</label>
+        <input type="text" id="nombreTarea" maxlength="100"><br>
+        <label>Tiempo Intervalo (hh:mm:ss):</label>
+        <input type="text" id="tiempoIntervalo"><br>
+        <label>Cantidad de Intervalos:</label>
+        <input type="number" id="cantidadIntervalos"><br>
+        <button id="iniciarTareaBtn">Iniciar Tarea</button>
+        <button id="cancelarTareaBtn">Cancelar</button>
+      </div>
+
+      <!-- Script para el manejo del formulario y validaciones -->
+      <script>
+        $(document).ready(function () {
+          console.log("jQuery listo para usarse!");
+
+          // Mostrar el formulario de agregar tarea
+          $("#agregarTareaBtn").click(function () {
+            $("#formularioTarea").show();
+            $(this).hide();
+          });
+
+          // Cancelar la creación de la tarea y ocultar el formulario
+          $("#cancelarTareaBtn").click(function () {
+            $("#formularioTarea").hide();
+            $("#agregarTareaBtn").show();
+          });
+
+          // Iniciar la creación de una tarea nueva con validaciones
+          $("#iniciarTareaBtn").click(function () {
+            let errores = [];
+            const nombre = $("#nombreTarea").val();
+            const tiempoIntervalo = $("#tiempoIntervalo").val();
+            const cantidadIntervalos = parseInt($("#cantidadIntervalos").val());
+
+            // Validaciones
+            if (!nombre || nombre.length > 100) {
+              errores.push("El nombre debe tener como máximo 100 caracteres.");
+            }
+            if (!/^(\d{2}):(\d{2}):(\d{2})$/.test(tiempoIntervalo)) {
+              errores.push("El tiempo del intervalo debe estar en formato hh:mm:ss.");
+            }
+            if (isNaN(cantidadIntervalos) || cantidadIntervalos <= 0) {
+              errores.push("La cantidad de intervalos debe ser un valor numérico mayor a 0.");
+            }
+
+            if (errores.length > 0) {
+              alert(errores.join("\n"));
+            } else {
+              const partesTiempo = tiempoIntervalo.split(":");
+              const duracion = parseInt(partesTiempo[0]) * 3600 + parseInt(partesTiempo[1]) * 60 + parseInt(partesTiempo[2]);
+              crearTarea(nombre, duracion, cantidadIntervalos);
+              $("#formularioTarea").hide();
+              $("#agregarTareaBtn").show();
+            }
+          });
+
+          // Mostrar/ocultar tareas finalizadas
+          $("#toggleFinalizadas").click(function () {
+            $("#tareasFinalizadas").toggle();
+            $(this).text($(this).text() === '▼' ? '▲' : '▼');
+          });
+        });
+
+        let tareaId = 0;
+      </script>
+
+      <h3>► Tareas Pendientes</h3>
+      <ul id="tareasPendientes" class="lista-tareas">
+        <!-- las tareas pendientes se agregarán aquí -->
+      </ul>
+
+      <!-- Script para crear una nueva tarea y añadirla a la lista de tareas pendientes -->
+      <script>
+        function crearTarea(nombre, duracion, intervalos) {
+          const tarea = {
+            id: tareaId++,
+            nombre: nombre,
+            duracion: duracion,
+            intervalos: intervalos,
+            intervaloActual: 1,
+            tiempoRestante: duracion
+          };
+          const tareaElemento = $("<li></li>")
+            .attr("id", `tarea-${tarea.id}`)
+            .addClass("tarea verde")
+            .html(`<input type='checkbox' id='checkbox-${tarea.id}' disabled> ${tarea.nombre} - ${formatearTiempo(tarea.tiempoRestante)} - Intervalo ${tarea.intervaloActual}`);
+          $("#tareasPendientes").append(tareaElemento);
+          iniciarCronometro(tarea, tareaElemento);
+        }
+
+        // Formatear el tiempo de segundos a mm:ss
+        function formatearTiempo(segundos) {
+          const minutos = Math.floor(segundos / 60);
+          const segundosRestantes = segundos % 60;
+          return `${minutos}:${segundosRestantes < 10 ? '0' : ''}${segundosRestantes}`;
+        }
+      </script>
+
+      <h3><button id="toggleFinalizadas">▼</button> Tareas Finalizadas</h3>
+      <ul id="tareasFinalizadas" class="lista-tareas">
+        <!-- las tareas finalizadas se agregarán aquí -->
+      </ul>
+
+      <!-- Script para manejar el cronómetro de cada tarea y actualizar su estado -->
+      <script>
+        function iniciarCronometro(tarea, elemento) {
+          const interval = setInterval(() => {
+            tarea.tiempoRestante--;
+            actualizarEstilo(tarea, elemento);
+            elemento.html(`<input type='checkbox' id='checkbox-${tarea.id}' disabled> ${tarea.nombre} - ${formatearTiempo(tarea.tiempoRestante)} - Intervalo ${tarea.intervaloActual}`);
+            if (tarea.tiempoRestante <= 0) {
+              clearInterval(interval);
+              $(`#checkbox-${tarea.id}`).prop("disabled", false);
+              $(`#checkbox-${tarea.id}`).change(function () {
+                if (this.checked) {
+                  if (tarea.intervaloActual >= tarea.intervalos) {
+                    finalizarTarea(tarea, elemento);
+                  } else {
+                    tarea.intervaloActual++;
+                    tarea.tiempoRestante = tarea.duracion;
+                    iniciarCronometro(tarea, elemento);
+                  }
+                }
+              });
+              elemento.addClass("animacion-color");
+            }
+          }, 1000);
+        }
+        // Actualizar el estilo de la tarea dependiendo del tiempo restante
+        function actualizarEstilo(tarea, elemento) {
+          const porcentajeRestante = (tarea.tiempoRestante / tarea.duracion) * 100;
+          elemento.removeClass("rojo amarillo verde bold");
+
+          if (porcentajeRestante < 20) {
+            elemento.addClass("rojo");
+          } else if (porcentajeRestante < 80) {
+            elemento.addClass("amarillo");
+          } else {
+            elemento.addClass("verde");
+          }
+
+          if (tarea.tiempoRestante < 60) {
+            elemento.addClass("bold");
+          }
+        }
+        // Finalizar una tarea y moverla a la lista de tareas finalizadas
+        function finalizarTarea(tarea, elemento) {
+          elemento.removeClass("rojo amarillo verde bold animacion-color");
+          elemento.addClass("finalizado");
+          elemento.html(`<input type='checkbox' id='checkbox-${tarea.id}' checked disabled> ${tarea.nombre} - Finalizado`);
+          $("#tareasPendientes").remove(`#tarea-${tarea.id}`);
+          $("#tareasFinalizadas").append(elemento);
+        }
+      </script>
+    </div>
+  </body>
+</html>
